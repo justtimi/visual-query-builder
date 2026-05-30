@@ -1,6 +1,6 @@
 import { addNode } from "@/utils/addNode";
-import { createRule } from "@/utils/createNodes";
-import { createGroup } from "@/utils/createNodes";
+import { createRule } from "@/utils/createNode";
+import { createGroup } from "@/utils/createNode";
 import { QueryNode } from "@/types/query";
 
 const root: QueryNode = createGroup();
