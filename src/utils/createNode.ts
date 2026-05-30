@@ -18,4 +18,3 @@ export function createGroup(): GroupNode {
     children: [],
   };
 }
-

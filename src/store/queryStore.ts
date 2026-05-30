@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { QueryNode } from "@/types/query";
-import { createGroup } from "@/utils/createNodes";
+import { createGroup } from "@/utils/createNode";
 import { addNode } from "@/utils/addNode";
 import { removeNode } from "@/utils/removeNode";
 
