@@ -1,14 +1,21 @@
-import { QueryNode, RuleNode } from "@/types/query";
+import { GroupNode, QueryNode, RuleNode } from "@/types/query";
 
-export function updateRuleValue(
+export function updateNode(
   tree: QueryNode,
   nodeId: string,
-  value: RuleNode["value"]
+  updates: Partial<RuleNode> | Partial<GroupNode>,
 ): QueryNode {
-  if (tree.id === nodeId && tree.type === "rule") {
+  if (tree.id === nodeId) {
+    if (tree.type === "rule") {
+      return {
+        ...tree,
+        ...(updates as Partial<RuleNode>),
+      };
+    }
+
     return {
       ...tree,
-      value,
+      ...(updates as Partial<GroupNode>),
     };
   }
 
@@ -16,10 +23,9 @@ export function updateRuleValue(
     return {
       ...tree,
       children: tree.children.map((child) =>
-        updateRuleValue(child, nodeId, value)
+        updateNode(child, nodeId, updates),
       ),
     };
   }
-
   return tree;
 }

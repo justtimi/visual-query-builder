@@ -8,9 +8,12 @@ export type Operator =
   | "greater_than"
   | "less_than"
   | "in"
-  | "between";
-
-export type FieldType = "string" | "number" | "date" | "enum";
+  | "between"
+  | "before"
+  | "after"
+  | "on_or_before"
+  | "on_or_after"
+  | "not_in";
 
 export type ValueType = string | number | boolean | string[] | number[];
 
