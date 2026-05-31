@@ -1,10 +1,12 @@
-import QueryBuilder from '@/components/query-builder/QueryBuilder'
-import React from 'react'
+import Home from "@/components/Home";
+import React from "react";
 
 const page = () => {
   return (
-    <div><QueryBuilder/></div>
-  )
-}
+    <div>
+      <Home />
+    </div>
+  );
+};
 
-export default page
+export default page;

@@ -2,6 +2,7 @@
 
 import { useQueryStore } from "@/store/queryStore";
 import { Group } from "./Group";
+import { QueryPreview } from "./QueryPreview";
 
 export default function QueryBuilder() {
   const tree = useQueryStore((state) => state.tree);
@@ -10,12 +11,13 @@ export default function QueryBuilder() {
     <div className="p-4 space-y-4">
       <h1 className="text-xl font-bold">Query Builder</h1>
 
-      <pre className="text-xs bg-primary p-2 rounded">
-        {JSON.stringify(tree, null, 2)}
-      </pre>
-      <div className="p-4">
-      <Group node={tree} />
-    </div>
+      <div className="p-4 flex gap-4 items-start justify-center">
+        <div className="w-1/2 shrink-0">
+          <Group node={tree} />
+        </div>
+
+        <QueryPreview />
+      </div>
     </div>
   );
 }
