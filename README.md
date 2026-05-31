@@ -520,195 +520,6 @@ At this point, the query builder became fully **schema-driven end-to-end**:
 
 Phase 3 was the point where the system stopped being just type-aware and became truly **schema-driven and intelligent**.
 
-This pahse was about building an executor that can run through data and bring out useful information.
-
-Firstly, I strated with defining a type for the tyep of mockData that I will use. And I decided to use a User type
-
-```ts
-export type User = {
-  name: string;
-  age: number;
-  status: "active" | "inactive";
-  purchases: number;
-};
-```
-
-Then i defined teh mockData to go with that type.
-
-Then I created a queryExecutor file in teh utils folder to create a list of helper functions that I will be using to execute the query. There is executeQuery(), evaluateNode(), and evaluateRule().
-
-wE START WITH EVALUATErULE FIRST, WHICH CHECKS THE CASE BASED ON THE TYPE OF OPERATOR of the rule. the function takes in the item with teh type of Usr and the rule and returns a boolean. And tehn fron there, we define a variable callled value, which accesses the rule.field in the item and then we go through the cases,and then for each case, perform a particular operation
-
-```ts
-switch (rule.operator) {
-  case "equals":
-    return value === rule.value;
-
-  case "not_equals":
-    return value !== rule.value;
-
-  case "contains":
-    return String(value).includes(String(rule.value));
-
-  case "greater_than":
-    return Number(value) > Number(rule.value);
-
-  case "less_than":
-    return Number(value) < Number(rule.value);
-
-  default:
-    return false;
-}
-```
-
-Back to evaluateNode, ehich takes i the item with tha type of User and a node with the type of QueryNode.
-If teh type of the node is rule, then we return evaluateRule with item and node as parameters. But teh type of node is group, then we perform recursion. we map through the children of the node, and then evaluateNode again with teh item, and the child.
-
-return node should return a boolean, and so if the operator is AND, we return results.every but if it is OR, we return result.some.
-
-And then teh base return is to return false.
-
-Then finally, the function evaluteQuery, which takes in teh tree, we return the filter of our mockData, where each item is evaluated by ebvaluateNode with teh item and the tree.
-
-In teh queryStore, we add these to teh interface
-
-```ts
-interface QueryStore {
-  results: User[];
-  isLoading: boolean;
-  executedTree: QueryNode | null;
-  runQuery: () => Promise<void>;
-  clearResults: () => void;
-}
-```
-
-Then in runQuery, I started by setting isLoading to true. Then to simulate as if I got it from a backend, I use a setTimeout of 300milliseconds.
-
-Then, I get the tree and then save it to a variable. then i create a variable called results to store teh returned value of executeQuery with teh tree as the paramneter.
-
-And then set results, executedTree to be the tree variable, and then isLoading to be false.
-
-Latly, the function clearResults, sets the results to be an empty rray and the executedTree to be null.
-
-The ResultsPanel componenet is where it all comes together
-we import these from the store
-
-```tsx
-const results = useQueryStore((s) => s.results);
-const isLoading = useQueryStore((s) => s.isLoading);
-const runQuery = useQueryStore((s) => s.runQuery);
-const clearResults = useQueryStore((s) => s.clearResults);
-const executedTree = useQueryStore((s) => s.executedTree);
-```
-
-Then I created two new derived state variables, hasExecuted which is the value of executedTree is not equal to null and then hasResults which is results.length > 0.
-
-Then I mapped through the results in teh ScrllArea
-
-```tsx
-<div className="space-y-4 w-full">
-  <div className="flex items-center justify-between">
-    <div className="flex items-center gap-2">
-      <Users className="w-4 h-4 text-muted-foreground" />
-      <h3 className="font-semibold">Results</h3>
-    </div>
-    <div className="space-x-2">
-      <Button
-        size="sm"
-        onClick={runQuery}
-        disabled={isLoading}
-        className="gap-2"
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Executing...
-          </>
-        ) : (
-          "Execute Query"
-        )}
-      </Button>
-
-      {hasExecuted && (
-        <Button size="sm" variant="outline" onClick={clearResults}>
-          Clear
-        </Button>
-      )}
-    </div>
-  </div>
-
-  <Separator />
-
-  {!hasExecuted ? (
-    <div className="text-center py-12 text-muted-foreground">
-      <p>Build a query and click &quot;Execute Query&quot; to see results</p>
-    </div>
-  ) : isLoading ? (
-    <div className="text-center py-12">
-      <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-      <p className="text-sm text-muted-foreground mt-3">Executing query...</p>
-    </div>
-  ) : hasResults ? (
-    <div className="space-y-3">
-      <Badge variant="secondary" className="w-fit">
-        {results.length} result{results.length !== 1 ? "s" : ""} found
-      </Badge>
-
-      <ScrollArea className="h-96 border rounded p-3">
-        <div className="space-y-2 pr-4">
-          {results.map((user) => (
-            <div
-              key={user.name}
-              className="rounded border p-3 bg-card hover:bg-accent transition-colors"
-            >
-              <div className="font-medium text-sm">{user.name}</div>
-              <div className="text-xs text-muted-foreground mt-2 space-y-1">
-                <div>
-                  <span className="font-semibold">Age:</span> {user.age}
-                </div>
-                <div>
-                  <span className="font-semibold">Status:</span>{" "}
-                  <Badge variant="outline" className="ml-1 text-xs">
-                    {user.status}
-                  </Badge>
-                </div>
-                <div>
-                  <span className="font-semibold">Purchases:</span>{" "}
-                  {user.purchases}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </ScrollArea>
-    </div>
-  ) : (
-    <div className="text-center py-12 text-muted-foreground">
-      <p>No results found</p>
-      <p className="text-xs mt-2">Try adjusting your query filters</p>
-    </div>
-  )}
-</div>
-```
-
-So then I just rendered theis in teh import and export page for now, in a card compoenent
-
-```tsx
-<Card className="max-w-2xl">
-  <CardHeader>
-    <CardTitle>Execution Results</CardTitle>
-    <CardDescription>
-      Build your query in the Workspace tab, then execute it here
-    </CardDescription>
-  </CardHeader>
-  <CardContent>
-    <ResultsPanel />
-  </CardContent>
-</Card>
-```
-
-
-And that was all for this phase.
 This phase was about creating the compiler that creates the MongoDB code. I chose MongoDB first because it was easier to implement than either SQL or Prisma and thought that they can be implemented later.
 
 So I started with creating a file called queryCompiler.ts and started with a function called compileTreeToMongo that takes in a node as a parameter, and returns the compiled object.
@@ -826,4 +637,217 @@ The / route then had the Home componenet. Then I removed the results tab in teh 
 
 
 And that ended what I did for phase 4.
+
+Got it. I'll keep it as plain text and not use a writing block.
+
+## Phase 5
+
+This phase was about building an executor that can run through data and bring out useful information.
+
+Firstly, I started by defining a type for the mock data that I would use. And I decided to use a `User` type.
+
+```ts
+export type User = {
+  name: string;
+  age: number;
+  status: "active" | "inactive";
+  purchases: number;
+};
+```
+
+Then I defined the mock data to go with that type.
+
+Then I created a `queryExecutor.ts` file in the `utils` folder to create a list of helper functions that I would be using to execute the query. There is `executeQuery()`, `evaluateNode()`, and `evaluateRule()`.
+
+We start with `evaluateRule()` first, which checks the case based on the type of operator of the rule. The function takes in the item with the type of `User` and the rule, and returns a boolean.
+
+From there, I define a variable called `value`, which accesses the `rule.field` in the item. Then I go through the cases and, for each case, perform a particular operation.
+
+```ts
+switch (rule.operator) {
+  case "equals":
+    return value === rule.value;
+
+  case "not_equals":
+    return value !== rule.value;
+
+  case "contains":
+    return String(value).includes(String(rule.value));
+
+  case "greater_than":
+    return Number(value) > Number(rule.value);
+
+  case "less_than":
+    return Number(value) < Number(rule.value);
+
+  default:
+    return false;
+}
+```
+
+Back to `evaluateNode()`, which takes in the item with the type of `User` and a node with the type of `QueryNode`.
+
+If the type of the node is a rule, then we return `evaluateRule()` with `item` and `node` as parameters.
+
+But if the type of the node is a group, then we perform recursion. We map through the children of the node and then call `evaluateNode()` again with the item and the child.
+
+`evaluateNode()` should return a boolean, and so if the logical operator is `AND`, we return `results.every()`, but if it is `OR`, we return `results.some()`.
+
+And then the base return is simply:
+
+```ts
+return false;
+```
+
+Then finally, the function `executeQuery()`, which takes in the tree. We return the filtered version of our mock data, where each item is evaluated by `evaluateNode()` with the item and the tree.
+
+In `queryStore`, I added these to the interface:
+
+```ts
+interface QueryStore {
+  results: User[];
+  isLoading: boolean;
+  executedTree: QueryNode | null;
+  runQuery: () => Promise<void>;
+  clearResults: () => void;
+}
+```
+
+Then in `runQuery()`, I started by setting `isLoading` to `true`.
+
+Then, to simulate as if I got the data from a backend, I used a `setTimeout()` of 300 milliseconds.
+
+Then I get the tree and save it to a variable. After that, I create a variable called `results` to store the returned value of `executeQuery()` with the tree as the parameter.
+
+Then I set `results`, `executedTree` to be the tree variable, and `isLoading` to be `false`.
+
+Lastly, the function `clearResults()` sets the results to be an empty array and the `executedTree` to be `null`.
+
+The `ResultsPanel` component is where it all comes together.
+
+We import these from the store:
+
+```tsx
+const results = useQueryStore((s) => s.results);
+const isLoading = useQueryStore((s) => s.isLoading);
+const runQuery = useQueryStore((s) => s.runQuery);
+const clearResults = useQueryStore((s) => s.clearResults);
+const executedTree = useQueryStore((s) => s.executedTree);
+```
+
+Then I created two new derived state variables:
+
+```ts
+const hasExecuted = executedTree !== null;
+const hasResults = results.length > 0;
+```
+
+`hasExecuted` checks whether a query has already been executed, while `hasResults` checks if the query returned any results.
+
+Then I mapped through the results in the `ScrollArea`.
+
+```tsx
+<div className="space-y-4 w-full">
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-2">
+      <Users className="w-4 h-4 text-muted-foreground" />
+      <h3 className="font-semibold">Results</h3>
+    </div>
+    <div className="space-x-2">
+      <Button
+        size="sm"
+        onClick={runQuery}
+        disabled={isLoading}
+        className="gap-2"
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Executing...
+          </>
+        ) : (
+          "Execute Query"
+        )}
+      </Button>
+
+      {hasExecuted && (
+        <Button size="sm" variant="outline" onClick={clearResults}>
+          Clear
+        </Button>
+      )}
+    </div>
+  </div>
+
+  <Separator />
+
+  {!hasExecuted ? (
+    <div className="text-center py-12 text-muted-foreground">
+      <p>Build a query and click &quot;Execute Query&quot; to see results</p>
+    </div>
+  ) : isLoading ? (
+    <div className="text-center py-12">
+      <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+      <p className="text-sm text-muted-foreground mt-3">Executing query...</p>
+    </div>
+  ) : hasResults ? (
+    <div className="space-y-3">
+      <Badge variant="secondary" className="w-fit">
+        {results.length} result{results.length !== 1 ? "s" : ""} found
+      </Badge>
+
+      <ScrollArea className="h-96 border rounded p-3">
+        <div className="space-y-2 pr-4">
+          {results.map((user) => (
+            <div
+              key={user.name}
+              className="rounded border p-3 bg-card hover:bg-accent transition-colors"
+            >
+              <div className="font-medium text-sm">{user.name}</div>
+              <div className="text-xs text-muted-foreground mt-2 space-y-1">
+                <div>
+                  <span className="font-semibold">Age:</span> {user.age}
+                </div>
+                <div>
+                  <span className="font-semibold">Status:</span>{" "}
+                  <Badge variant="outline" className="ml-1 text-xs">
+                    {user.status}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="font-semibold">Purchases:</span>{" "}
+                  {user.purchases}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  ) : (
+    <div className="text-center py-12 text-muted-foreground">
+      <p>No results found</p>
+      <p className="text-xs mt-2">Try adjusting your query filters</p>
+    </div>
+  )}
+</div>
+```
+
+So then I just rendered this in the import and export page for now, inside a card component.
+
+```tsx
+<Card className="max-w-2xl">
+  <CardHeader>
+    <CardTitle>Execution Results</CardTitle>
+    <CardDescription>
+      Build your query in the Workspace tab, then execute it here
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    <ResultsPanel />
+  </CardContent>
+</Card>
+```
+
+And that was all for this phase.
+
 
