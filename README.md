@@ -1,350 +1,380 @@
-# **Phase 1**
+# **Phase 3**
 
-This is to talk about the first phase of what I have done. As you can see here, this is a **visual query engine builder**, a system where users can create complex database-style filters and logic without writing code manually. Instead of typing SQL or MongoDB queries, users interact with a graphical interface to add rules, group conditions, nest **AND/OR logic infinitely**, preview the generated query in real time, and run it against mock datasets to inspect results dynamically.
+Phase 3 was about **schema-driven intelligence** for the rules. Each rule is supposed to be contextual. There is a dropdown that allows users to select values based on the type of field selected, and then basic validation is also implemented.
 
-Underneath the UI, the real challenge is engineering a **scalable recursive architecture** that can manage deeply nested query trees, schema-driven validation, dynamic rendering, performant state updates, drag-and-drop interactions, query parsing, and live execution simulation, all while keeping the experience smooth, maintainable, and production-grade using technologies like **Next.js, TypeScript, Zustand, DnD Kit**, and recursive React components.
+## **1. Redefining the Schema**
 
-So the first thing I had to do was start with the **logic layer** of the project, because it’s easier to build the logic first so wiring the UI becomes much easier later.
+The first thing I did was redefine the shape of my schema in the `types/schema.ts` file.
 
----
+The `schema.ts` file starts by defining `FieldType`, which can be:
 
-## **1. Core Types (`query.ts`)**
+- `string` for name
+- `number` for age
+- `enum` for status (meaning it has predefined options)
+- `date` for createdAt
 
-I defined the types in `query.ts` for a **rule** and a **group**. We define the types for a `GroupNode` and a `RuleNode`.
+This `FieldType` is then used in the `SchemaField` type, which contains:
 
-A `RuleNode` contains:
+- `label`
+- `type` (which is a `FieldType`)
+- `options` (optional)
 
-- `id` (from the base node extension)
-- `type`
-- `field`
-- `operator`
-- `value`
+This allows every field in the schema to describe how it should behave in the UI.
 
-This is what makes up a single condition node.
+## **2. Creating the Schema Configuration**
 
-A `GroupNode`, on the other hand, contains children which can be:
-
-- a combination of `RuleNodes`
-- a combination of `GroupNodes`
-- or both
-
-It also contains:
-
-- `id`
-- `type`
-- a logical operator (**AND / OR**)
-
-To remove the `any` type, I created a `ValueType`:
+Next, I moved to the `schema.ts` file inside the `lib` folder and mapped fields to their respective types.
 
 ```ts
-export type ValueType = string | number | boolean | string[] | number[];
+import { SchemaField } from "@/types/schema";
+
+export const schema: Record<string, SchemaField> = {
+  name: {
+    label: "Name",
+    type: "string",
+  },
+  age: {
+    label: "Age",
+    type: "number",
+  },
+  status: {
+    label: "Status",
+    type: "enum",
+    options: ["active", "inactive"],
+  },
+  createdAt: {
+    label: "Created At",
+    type: "date",
+  },
+};
 ```
 
-This made value handling more structured and type-safe.
+This became the single source of truth for all fields in the query builder.
 
----
+## **3. Schema Utility Functions**
 
-## **2. Utility Functions (Helpers)**
+After that, I created helper functions in `utils/schema.ts`.
 
-In the utils folder, I created helper functions to manage node creation and tree manipulation.
+There are four main ones.
 
----
+### **`getFieldType()`**
 
-### **`createRule()`**
+`getFieldType` checks the schema object from the lib folder.
 
-`createRule` is responsible for creating a rule node. It returns an object with a default configuration:
-
-- random `id`
-- type: `rule`
-- operator: `equals`
-- empty `field`
-- empty `value`
-
----
-
-### **`createGroup()`**
-
-`createGroup` is similar to `createRule`, but for groups. It returns:
-
-- random `id`
-- type: `group`
-- logic operator: `AND`
-- empty `children` array
-
----
-
-### **`addNode()`**
-
-`addNode` is a function that takes three parameters:
-
-- `tree` → the current node being inspected
-- `parentId` → the group where we want to insert the node
-- `newNode` → the node we want to insert
-
-It starts by checking if the current node matches the `parentId`:
+It takes a field as a parameter, accesses that field in the schema, and then returns its type.
 
 ```ts
-if (tree.id === parentId && tree.type === "group") {
-  return {
-    ...tree,
-    children: [...tree.children, newNode],
-  };
+return schema[field]?.type;
+```
+
+This allows the UI to know whether a field is a string, number, enum, or date.
+
+### **`getEnumOptions()`**
+
+`getEnumOptions` works similarly.
+
+In this case, only enum fields (such as `status`) have options.
+
+The function accesses the field and returns its options. If the field has no options, it returns an empty array instead.
+
+This prevents undefined values from causing issues in the UI.
+
+### **`getFields()`**
+
+`getFields` simply returns all the keys in the schema object.
+
+```ts
+return Object.keys(schema);
+```
+
+This is used to dynamically populate the field dropdown.
+
+### **`getDefaultValue()`**
+
+`getDefaultValue` is used to provide contextual default values.
+
+If the field type is:
+
+- `string`
+- `date`
+- `enum`
+
+then it returns:
+
+```ts
+"";
+```
+
+If the field type is `number`, it returns:
+
+```ts
+0;
+```
+
+This ensures that every field starts with a valid default value.
+
+## **4. Making the Rule Component Schema-Driven**
+
+After creating the schema helpers, the `Rule.tsx` component had to reflect them.
+
+First, I used:
+
+```ts
+const fields = getFields();
+```
+
+to retrieve all available fields.
+
+Then I used:
+
+```ts
+const fieldType = getFieldType(node.field);
+```
+
+to determine the type of the currently selected field.
+
+Finally, I used `operatorsByType` to determine which operators are allowed for that specific field type.
+
+### **Operators by Type**
+
+I defined operators for each field type:
+
+```ts
+export const operatorsByType: Record<FieldType, Operator[]> = {
+  string: ["equals", "not_equals", "contains", "starts_with"],
+  number: ["equals", "not_equals", "greater_than", "less_than"],
+  date: ["equals", "before", "after", "between", "on_or_before", "on_or_after"],
+  enum: ["equals", "not_equals", "in", "not_in"],
+};
+```
+
+This means that:
+
+- string fields can use operators like `contains`
+- number fields can use comparison operators
+- date fields can use date-specific operators
+- enum fields can use set-based operators
+
+This prevents users from selecting invalid combinations.
+
+For example, a number field should never be able to use `contains`.
+
+### **`handleFieldChange()`**
+
+The main function here is `handleFieldChange`, which takes a field as a parameter.
+
+When a user changes the field:
+
+1. It finds the field type using `getFieldType()`
+2. It retrieves the operators available for that type
+3. It selects the first operator as the default
+4. It resets the value using `getDefaultValue()`
+5. It updates the node
+
+So whenever a field changes, the operator and value are automatically reinitialized to match the new field type.
+
+This keeps the rule in a valid state.
+
+### **`handleOperatorChange()`**
+
+`handleOperatorChange` takes an operator of type `Operator`.
+
+When a user selects a new operator, it updates the current node with the new operator.
+
+### **`handleValueChange()`**
+
+`handleValueChange` follows the same idea.
+
+Whenever the user changes the value, the node is updated with the new value.
+
+### **Schema-Driven Dropdowns**
+
+After that, I replaced the old field input with a select component.
+
+The select is populated by mapping over the fields returned from:
+
+```ts
+getFields();
+```
+
+and on value change it calls:
+
+```ts
+handleFieldChange();
+```
+
+I did the same thing for the operators dropdown, except that it uses the operators available for the currently selected field type.
+
+This means both dropdowns are now completely driven by the schema configuration.
+
+If I add a new field to the schema later, the UI automatically adapts without requiring changes to the component itself.
+
+And that was the main work for `Rule.tsx`.
+
+At this point, the query builder had become schema-aware. Rules were no longer static inputs; they now adapted dynamically based on the field being selected.
+
+### **Adding Validation**
+
+The next step after this was adding **validation**, so that users could not create invalid query conditions.
+
+I started by defining the type for validation errors:
+
+```ts
+export type ValidationError = {
+  nodeId: string;
+  message: string;
+  field?: string;
+};
+```
+
+This gives every validation error:
+
+- the node that caused the error
+- the error message itself
+- an optional field name
+
+This makes it easy to associate validation errors with specific rules in the query tree.
+
+Then, in the `validateQuery.ts` file inside the `utils` folder, the validation logic depends on three things:
+
+- `operatorsByType`
+- `getFieldType`
+- `ValidationError`
+
+I started with the `validateQuery()` function, which takes two parameters:
+
+```ts
+validateQuery(
+  node: QueryNode,
+  errors: ValidationError[]
+)
+```
+
+and returns an array of `ValidationError`.
+
+The first thing it does is check if the node is a rule.
+
+If the node type is a rule, validation becomes straightforward.
+
+I create a variable called `rule`, which is simply the current node cast as a `RuleNode`.
+
+Then I retrieve the field type using:
+
+```ts
+const fieldType = getFieldType(rule.field);
+```
+
+I also define a variable called `isRuleActive`.
+
+A rule is considered active when it already has both:
+
+- a field
+- an operator
+
+This allows validation to ignore incomplete rules that have not been configured yet.
+
+Next, I create a set containing all operators that require a value in order to work.
+
+This makes it easy to determine whether a rule should have a value attached to it.
+
+The first validation check is for invalid fields.
+
+If `fieldType` does not exist, then the selected field is not valid according to the schema.
+
+In that case, I push a validation error into the errors array:
+
+```ts
+errors.push({
+  nodeId: rule.id,
+  message: "Invalid field selected",
+});
+```
+
+and immediately return the errors array.
+
+If the field is valid, I retrieve all operators that are allowed for that field type:
+
+```ts
+const allowedOperators = operatorsByType[fieldType];
+```
+
+Then I check whether the currently selected operator exists inside that list.
+
+If it does not, another validation error is added:
+
+```ts
+errors.push({
+  nodeId: rule.id,
+  message: "Operator is not valid for this field type",
+});
+```
+
+This prevents cases such as:
+
+- using `contains` on a number field
+- using `greater_than` on an enum field
+
+and other invalid combinations.
+
+Finally, if the rule is active, I check whether the current operator requires a value.
+
+```ts
+if (isRuleActive) {
+  const needsValue = operatorsThatNeedValue.has(rule.operator);
+
+  if (needsValue) {
+    if (rule.value === "" || rule.value === null || rule.value === undefined) {
+      errors.push({
+        nodeId: rule.id,
+        message: "Value cannot be empty",
+      });
+    }
+  }
 }
 ```
 
-If this condition is true, we return an **immutable copy** of the tree and add the new node to `children`:
-
-```ts
-children: [...tree.children, newNode];
-```
-
-Then we check if the current node is a group. If it is, it may contain nested groups, this is where **recursion** comes in.
-
-Recursion is when a function gradually solves itself by calling itself on smaller versions of the same problem until it reaches a **base case**.
-
-This is a concept in data structures and algorithms I’ve worked with before, commonly seen in examples like factorial calculations.
-
-So we return a copy of the tree, and recursively update children using:
-
-```ts
-children: tree.children.map((child) => addNode(child, parentId, newNode));
-```
-
-Because `map()` returns a new array, this also maintains **immutable state updates**.
-
-Finally, if no condition matches, we simply return the original tree.
-
----
-
-### **`findNode()`**
-
-This function is used to find a particular node in the tree.
-
-It takes two parameters:
-
-- `tree`: the tree to search in
-- `id`: the id of the node we are looking for
-
-It starts by checking if the current node matches:
-
-```ts
-if (tree.id === id) return tree;
-```
-
-If not, and the node is a group, we recursively search through its children:
-
-```ts
-for (const child of tree.children) {
-  const found = findNode(child, id);
-  if (found) return found;
-}
-```
-
-If no match is found, we return:
-
-```ts
-return null;
-```
-
----
-
-### **`removeNode()`**
-
-This function removes a node from the tree.
-
-It takes:
-
-- `tree`
-- `nodeId`
-
-If the current node is a group, we first create an updated copy where we remove the matching node:
-
-```ts
-children: tree.children.filter((child) => child.id !== nodeId);
-```
-
-Then we recursively apply the function again:
-
-```ts
-.map((child) => removeNode(child, nodeId))
-```
-
-Finally, if nothing is found, we return the original tree.
-
----
-
-## **3. Query Store (`queryStore.ts`)**
-
-After building the core utilities, I created a store called `queryStore.ts`.
-
-It handles four main things:
-
----
-
-### **`tree`**
-
-This initializes the state using:
-
-```ts
-createGroup();
-```
-
-This acts as the default root node.
-
----
-
-### **`setTree`**
-
-Directly sets the entire tree state.
-
----
-
-### **`addNodeToTree`**
-
-- gets the current tree
-- applies `addNode`
-- updates state with the new tree
-
----
-
-### **`removeNodeFromTree`**
-
-- gets the current tree
-- applies `removeNode`
-- updates state with the modified tree
-
----
-
-## **4. Extras**
-
-Lastly, I added:
-
-- a basic schema for future dynamic validation
-- simple unit tests for `createRule` and `createGroup`
-
----
-
-## **End of Phase 1**
-
-And that was everything for Phase 1.
-
-This phase was mainly about building the **core recursive engine**, the foundation that everything else in the project will sit on.
-
-Without this layer, the UI, interactions, and query preview system would not scale properly.
-
-# **Phase 2**
-
-Phase 2 is about the **UI**. It was a simple way to test out what I had already built in Phase 1 by implementing two main pieces of functionality:
-
-* Creating a rule
-* Creating a group
-
-It also comes with:
-
-* delete functionality for both rules and groups
-* add functionality for both rules and groups
-
-The main goal of this phase was wiring together the functions I wrote in the previous phase and connecting them to the UI.
-
----
-
-Both the **rule** and the **group** are controlled from `QueryBuilder.tsx`.
-
-I initially started by rendering the JSON object of the nodes so I could visually inspect the tree structure and confirm that my state updates were working correctly.
-
-I got the tree from the store and rendered a stringified version of it:
-
-```tsx
-<pre className="text-xs bg-primary p-2 rounded">
-  {JSON.stringify(tree, null, 2)}
-</pre>
-```
-
-This made it easy to verify that nodes were being added and removed correctly before building the actual UI.
-
----
-
-After that, I decided to move to a better approach by rendering an initial **Group component** that acts as the root of the tree.
-
-The `Group` component accepts a `node` prop, which in this case is the tree itself, and it also uses two functions from the store:
-
-* `addNodeToTree`
-* `removeNodeFromTree`
-
-This became the starting point for rendering the entire query structure.
-
----
-
-The first thing the component does is check the type of the node.
-
-If the node is a rule, we immediately render the `Rule` component:
-
-```tsx
-if (node.type === "rule") {
-  return <Rule node={node} />;
-}
-```
-
-The `Rule` component receives the current node through its `node` prop.
-
----
-
-Next, I created wrapper functions around `addNodeToTree` and `removeNodeFromTree` to make it easier to:
-
-* add a rule
-* add a group
-* remove a rule
-* remove a group
-
-These functions are then connected to buttons in the UI.
-
-I rendered two main buttons:
-
-* **Add Rule**
-* **Add Group**
-
-Whenever either button is clicked, a new node is created and inserted into the current group.
-
----
-
-The last major part of this phase was rendering the children recursively.
-
-Since a group can contain:
-
-* rules
-* groups
-* or both
-
-I mapped through the children array and rendered the `Group` component again for each child:
-
-```tsx
-{node.children.map((child) => (
-  <Group key={child.id} node={child} />
-))}
-```
-
-This is what creates the **recursive UI**.
-
-The same component keeps rendering itself for nested groups, no matter how deep the tree becomes.
-
-This mirrors the recursive data structure that was created in Phase 1.
-
----
-
-For the **Rule component**, I simply displayed the data from the node in the format:
-
-```txt
-field operator value
-```
+This ensures that operators requiring user input cannot be left empty.
 
 For example:
 
 ```txt
-age > 18
+Age > ?
 ```
 
-At this stage, the values are still placeholders, but it allows me to visually confirm that rules are rendering correctly.
+would be considered invalid because the value is missing.
 
-I also imported `removeNodeFromTree` from the store and connected it to a delete button so that individual rules can be removed from the tree. At the end of Phase 2, I had a working recursive UI capable of rendering groups, rendering rules, adding rules, adding groups, deleting rules, deleting groups, and visualizing deeply nested query structures
+The final part handles groups.
 
-This was the first point where the architecture from Phase 1 became visible on the screen and proved that the recursive tree structure and state management were working correctly.
+If the node type is a group, then we recursively validate every child inside that group.
+
+```ts
+for (const child of node.children) {
+  validateQuery(child, errors);
+}
+```
+
+This is the same recursive pattern used throughout the project.
+
+Since groups can contain:
+
+- rules
+- groups
+- or both
+
+the validator needs to keep traversing the tree until every node has been checked.
+
+At the very end, if none of the validation checks produce errors, we simply return the `errors` array.
+
+```ts
+return errors;
+```
+
+What I like about this implementation is that the validation engine automatically scales with the tree structure.
+
+Whether the query contains:
+
+- 2 rules
+- 20 rules
+- or 200 nested groups
+
+the same recursive validation function continues to work without any additional logic. This is one of the advantages of building the query system as a recursive tree from the beginning.
