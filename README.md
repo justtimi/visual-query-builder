@@ -519,3 +519,193 @@ At this point, the query builder became fully **schema-driven end-to-end**:
 - Value input adapts automatically based on schema config
 
 Phase 3 was the point where the system stopped being just type-aware and became truly **schema-driven and intelligent**.
+
+This pahse was about building an executor that can run through data and bring out useful information.
+
+Firstly, I strated with defining a type for the tyep of mockData that I will use. And I decided to use a User type
+
+```ts
+export type User = {
+  name: string;
+  age: number;
+  status: "active" | "inactive";
+  purchases: number;
+};
+```
+
+Then i defined teh mockData to go with that type.
+
+Then I created a queryExecutor file in teh utils folder to create a list of helper functions that I will be using to execute the query. There is executeQuery(), evaluateNode(), and evaluateRule().
+
+wE START WITH EVALUATErULE FIRST, WHICH CHECKS THE CASE BASED ON THE TYPE OF OPERATOR of the rule. the function takes in the item with teh type of Usr and the rule and returns a boolean. And tehn fron there, we define a variable callled value, which accesses the rule.field in the item and then we go through the cases,and then for each case, perform a particular operation
+
+```ts
+switch (rule.operator) {
+  case "equals":
+    return value === rule.value;
+
+  case "not_equals":
+    return value !== rule.value;
+
+  case "contains":
+    return String(value).includes(String(rule.value));
+
+  case "greater_than":
+    return Number(value) > Number(rule.value);
+
+  case "less_than":
+    return Number(value) < Number(rule.value);
+
+  default:
+    return false;
+}
+```
+
+Back to evaluateNode, ehich takes i the item with tha type of User and a node with the type of QueryNode.
+If teh type of the node is rule, then we return evaluateRule with item and node as parameters. But teh type of node is group, then we perform recursion. we map through the children of the node, and then evaluateNode again with teh item, and the child.
+
+return node should return a boolean, and so if the operator is AND, we return results.every but if it is OR, we return result.some.
+
+And then teh base return is to return false.
+
+Then finally, the function evaluteQuery, which takes in teh tree, we return the filter of our mockData, where each item is evaluated by ebvaluateNode with teh item and the tree.
+
+In teh queryStore, we add these to teh interface
+
+```ts
+interface QueryStore {
+  results: User[];
+  isLoading: boolean;
+  executedTree: QueryNode | null;
+  runQuery: () => Promise<void>;
+  clearResults: () => void;
+}
+```
+
+Then in runQuery, I started by setting isLoading to true. Then to simulate as if I got it from a backend, I use a setTimeout of 300milliseconds.
+
+Then, I get the tree and then save it to a variable. then i create a variable called results to store teh returned value of executeQuery with teh tree as the paramneter.
+
+And then set results, executedTree to be the tree variable, and then isLoading to be false.
+
+Latly, the function clearResults, sets the results to be an empty rray and the executedTree to be null.
+
+The ResultsPanel componenet is where it all comes together
+we import these from the store
+
+```tsx
+const results = useQueryStore((s) => s.results);
+const isLoading = useQueryStore((s) => s.isLoading);
+const runQuery = useQueryStore((s) => s.runQuery);
+const clearResults = useQueryStore((s) => s.clearResults);
+const executedTree = useQueryStore((s) => s.executedTree);
+```
+
+Then I created two new derived state variables, hasExecuted which is the value of executedTree is not equal to null and then hasResults which is results.length > 0.
+
+Then I mapped through the results in teh ScrllArea
+
+```tsx
+<div className="space-y-4 w-full">
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-2">
+      <Users className="w-4 h-4 text-muted-foreground" />
+      <h3 className="font-semibold">Results</h3>
+    </div>
+    <div className="space-x-2">
+      <Button
+        size="sm"
+        onClick={runQuery}
+        disabled={isLoading}
+        className="gap-2"
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Executing...
+          </>
+        ) : (
+          "Execute Query"
+        )}
+      </Button>
+
+      {hasExecuted && (
+        <Button size="sm" variant="outline" onClick={clearResults}>
+          Clear
+        </Button>
+      )}
+    </div>
+  </div>
+
+  <Separator />
+
+  {!hasExecuted ? (
+    <div className="text-center py-12 text-muted-foreground">
+      <p>Build a query and click &quot;Execute Query&quot; to see results</p>
+    </div>
+  ) : isLoading ? (
+    <div className="text-center py-12">
+      <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+      <p className="text-sm text-muted-foreground mt-3">Executing query...</p>
+    </div>
+  ) : hasResults ? (
+    <div className="space-y-3">
+      <Badge variant="secondary" className="w-fit">
+        {results.length} result{results.length !== 1 ? "s" : ""} found
+      </Badge>
+
+      <ScrollArea className="h-96 border rounded p-3">
+        <div className="space-y-2 pr-4">
+          {results.map((user) => (
+            <div
+              key={user.name}
+              className="rounded border p-3 bg-card hover:bg-accent transition-colors"
+            >
+              <div className="font-medium text-sm">{user.name}</div>
+              <div className="text-xs text-muted-foreground mt-2 space-y-1">
+                <div>
+                  <span className="font-semibold">Age:</span> {user.age}
+                </div>
+                <div>
+                  <span className="font-semibold">Status:</span>{" "}
+                  <Badge variant="outline" className="ml-1 text-xs">
+                    {user.status}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="font-semibold">Purchases:</span>{" "}
+                  {user.purchases}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  ) : (
+    <div className="text-center py-12 text-muted-foreground">
+      <p>No results found</p>
+      <p className="text-xs mt-2">Try adjusting your query filters</p>
+    </div>
+  )}
+</div>
+```
+
+So then I just rendered theis in teh import and export page for now, in a card compoenent
+
+```tsx
+<Card className="max-w-2xl">
+  <CardHeader>
+    <CardTitle>Execution Results</CardTitle>
+    <CardDescription>
+      Build your query in the Workspace tab, then execute it here
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    <ResultsPanel />
+  </CardContent>
+</Card>
+```
+
+
+And that was all for this phase.
