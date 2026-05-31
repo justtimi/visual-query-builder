@@ -9,7 +9,6 @@ const Home = () => {
       <TabsList>
         <TabsTrigger value="builder">Builder</TabsTrigger>
         <TabsTrigger value="json">JSON</TabsTrigger>
-        <TabsTrigger value="results">Results</TabsTrigger>
       </TabsList>
 
       <TabsContent value="builder">
@@ -18,12 +17,6 @@ const Home = () => {
 
       <TabsContent value="json">
         <JSONPreview/>
-      </TabsContent>
-
-      <TabsContent value="results">
-        <div className="p-4 text-sm text-muted-foreground">
-          Execution engine coming next...
-        </div>
       </TabsContent>
     </Tabs>
   );
