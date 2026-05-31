@@ -378,3 +378,144 @@ Whether the query contains:
 - or 200 nested groups
 
 the same recursive validation function continues to work without any additional logic. This is one of the advantages of building the query system as a recursive tree from the beginning.
+
+### **Making Value Fully Schema-Driven**
+
+Then I realized something that I did **not fully align with the requirements of the application**.
+
+I was not rendering the value _contextually_.
+
+What I mean is: the value input is supposed to depend on the **type of the field**. It was already type-driven, but not fully schema-driven — and that’s what I decided to fix.
+
+I started by adding two new properties to each field in the schema inside `schema.ts` (in the `lib` folder):
+
+- `uiType`
+- `defaultValue`
+
+This made the schema not just define _data types_, but also define _how the UI should behave_.
+
+Then I went into `schema.ts` inside the `utils` folder and refactored:
+
+#### **`getDefaultValue()`**
+
+Now instead of hardcoding defaults, it returns the `defaultValue` directly from the schema based on the field.
+
+I also created a similar function:
+
+#### **`getFieldUiType()`**
+
+which returns the `uiType` of a field directly from the schema.
+
+This was the final step that made everything truly **schema-driven**, not just type-driven.
+
+### **6. Creating `ValueInput.tsx` (Dynamic UI Renderer)**
+
+After that, I created a new component called **`ValueInput.tsx`**.
+
+This component is responsible for rendering the correct input UI depending on the `uiType`.
+
+I started by getting the UI type of the field:
+
+```ts
+const uiType = getFieldUiType(field);
+```
+
+Then I used a **switch statement** to render different inputs based on the type.
+
+I also added an edge case:
+
+If no field is selected yet, it renders a disabled input prompting the user to select a field first.
+
+### **7. Full `ValueInput.tsx` Component**
+
+This is the full implementation:
+
+```tsx id="value-input"
+import { ValueType } from "@/types/query";
+import { Input } from "./ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { getFieldUiType, getEnumOptions } from "@/utils/schema";
+
+type Props = {
+  field: string;
+  value: unknown;
+  onChange: (value: ValueType) => void;
+};
+
+export function ValueInput({ field, value, onChange }: Props) {
+  const uiType = getFieldUiType(field);
+
+  if (!field) {
+    return (
+      <Input disabled placeholder="Select a field first" className="w-fit" />
+    );
+  }
+
+  const safeValue =
+    value === undefined || value === null ? undefined : String(value);
+
+  switch (uiType) {
+    case "select":
+      return (
+        <Select value={safeValue} onValueChange={onChange}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Select value" />
+          </SelectTrigger>
+
+          <SelectContent>
+            {getEnumOptions(field).map((option) => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+
+    case "number":
+      return (
+        <Input
+          type="number"
+          className="w-32"
+          value={String(value ?? "")}
+          onChange={(e) => onChange(Number(e.target.value))}
+        />
+      );
+
+    case "date":
+      return (
+        <Input
+          type="date"
+          className="w-40"
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      );
+
+    case "text":
+    default:
+      return (
+        <Input
+          className="w-32"
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      );
+  }
+}
+```
+
+At this point, the query builder became fully **schema-driven end-to-end**:
+
+- Fields determine available operators
+- Fields determine default values
+- Fields determine UI input types
+- Value input adapts automatically based on schema config
+
+Phase 3 was the point where the system stopped being just type-aware and became truly **schema-driven and intelligent**.
