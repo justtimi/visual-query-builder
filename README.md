@@ -709,3 +709,121 @@ So then I just rendered theis in teh import and export page for now, in a card c
 
 
 And that was all for this phase.
+This phase was about creating the compiler that creates the MongoDB code. I chose MongoDB first because it was easier to implement than either SQL or Prisma and thought that they can be implemented later.
+
+So I started with creating a file called queryCompiler.ts and started with a function called compileTreeToMongo that takes in a node as a parameter, and returns the compiled object.
+
+But the logic for a ruleNode and a groupNode would be completely different.So if teh node is a rule, we define the shape of the response pertaining to teh operator. But this project is about sclability, and that method is not scalable. So instead, we use an operatorMap.
+
+I started with something simple first to see how the concept works
+
+```ts
+export const operatorMap: Record<string, string> = {
+  equals: "",
+  not_equals: "$ne",
+  greater_than: "$gt",
+  less_than: "$lt",
+  contains: "$regex",
+  starts_with: "$regex",
+  in: "$in",
+};
+```
+
+And tehn we import that operatorMap into teh compiler and tehn access the operator"s new name by using the rule.operator and assigning that to a variable.
+
+If the mongoOperator is null, teh we return a key of slug of the rule.field which its value is the rule.value. And if that is not the case, we return a slug of the rule.field with the value of an object, whuch contains the mongoOperator as teh property with the value of teh rule.value.
+
+And that is for if te node.type is a rule.
+
+If the node.type is a group
+
+We assign the node to a variable called group.
+And then the variable called compild children is equal to the value returned from mapping over group.childrenand in teh process compileTreeToMonog with the parameter of teh child. then after we filter the values of teh child that are not undefined.
+
+Then we have special cases for AND and OR. If teh logic operator is AND, then we return $and as the key and the children as the vaalue. But that is if the length is more than 1. If teh length of compiledChildren i 1, then we return the first child of compiledChildren.
+
+For OR, we return the $Or key with the value of compiledChhildren.
+
+```ts
+if (node.type === "group") {
+  const group = node;
+  const compiledChildren = group.children
+    .map((child) => compileTreeToMongo(child))
+    .filter((child): child is Record<string, unknown> => child !== undefined);
+
+  if (compiledChildren.length === 0) {
+    return {};
+  }
+
+  if (group.logic === "AND") {
+    if (compiledChildren.length === 1) {
+      return compiledChildren[0];
+    }
+    return {
+      $and: compiledChildren,
+    };
+  }
+  if (group.logic === "OR") {
+    return {
+      $or: compiledChildren,
+    };
+  }
+}
+```
+
+Then we have to reflect that in the store, so we import the function helper into the store, and then add in compiledQuery to the store, which is either the compiledObject or null. So initially, we set it to null, but in addNodeToTree, removeNodeFromTree, and updateNodeInTree, we set compiledQuery to be compiledTreeToMongo of the updated tree. and then we add it to the set method.
+
+And now, I decided to shift the layout of teh whole application. Initially we had the pre block on top whuch had the json and then the group element, which was teh buider. But now with the introduction of the compiler, I wanted the code to feature a tabs layout instead of the builder, then the json and then the results, whuch I would be building in a later phase. So I created a compoenent called QueryBuilder, and then shifted the comipler and the group compoeennt to that page, and then rendered them side by side. Then I moved the pre elemnt into a new componenet called JSONPreview and then added it as a tab. and then lastly was the results tab which did not have anything inside at the moment.
+
+I kept the tabs in the home compoenent.
+
+As for the QueryPreview, I took the compiledQuery from teh store. and then rendered it with JSON.stringify.
+
+```tsx
+<pre className="text-xs">
+  {compiledQuery ? JSON.stringify(compiledQuery, null, 2) : "No query yet"}
+</pre>
+```
+
+And tehn I decided to take everything one step further. By adding a sidebar.
+
+```tsx
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarTrigger,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarSeparator,
+  SidebarInset,
+} from "@/components/ui/sidebar";
+```
+
+I did this in the layout.tsx to make it easier later for page transitions.
+
+Then i ensured taht I dynamically rendered the routes by creating an array with the label of the route and its href and then map over the array in SidebarMenu for eaach SidebarMenuItem.
+
+```tsx
+<SidebarMenu>
+  {routes.map((route) => (
+    <SidebarMenuItem key={route.href}>
+      <SidebarMenuButton asChild>
+        <Link href={route.href}>{route.label}</Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  ))}
+</SidebarMenu>
+```
+
+
+Then I redefined the whole layout of the page. I added in four new routes, /, /saved, /import, /playground, /schema.
+
+The / route then had the Home componenet. Then I removed the results tab in teh home compoenent. 
+
+
+And that ended what I did for phase 4.
+
