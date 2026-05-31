@@ -1,8 +1,7 @@
 "use client";
 
-import { Operator, RuleNode } from "@/types/query";
+import { Operator, RuleNode, ValueType } from "@/types/query";
 import { useQueryStore } from "@/store/queryStore";
-import { Input } from "../ui/input";
 import {
   Select,
   SelectContent,
@@ -17,6 +16,7 @@ import { schema } from "@/lib/schema";
 import { getDefaultValue, getFields } from "@/utils/schema";
 import { operatorsByType } from "@/lib/operators";
 import { getFieldType } from "@/utils/schema";
+import { ValueInput } from "../ValueInput";
 
 type Props = {
   node: RuleNode;
@@ -38,7 +38,7 @@ export function Rule({ node }: Props) {
     updateNodeInTree(node.id, {
       field,
       operator: defaultOperator,
-      value: getDefaultValue(type),
+      value: getDefaultValue(field),
     });
   };
 
@@ -46,7 +46,7 @@ export function Rule({ node }: Props) {
     updateNodeInTree(node.id, { operator });
   };
 
-  const handleValueChange = (value: string) => {
+  const handleValueChange = (value: ValueType) => {
     updateNodeInTree(node.id, { value });
   };
 
@@ -80,11 +80,11 @@ export function Rule({ node }: Props) {
         </SelectContent>
       </Select>
 
-      <Input
-        className="w-32"
-        placeholder="value"
-        value={String(node.value ?? "")}
-        onChange={(e) => handleValueChange(e.target.value)}
+      <ValueInput
+        key={node.field}
+        field={node.field}
+        value={node.value}
+        onChange={handleValueChange}
       />
 
       <Button
