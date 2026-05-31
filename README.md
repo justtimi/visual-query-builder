@@ -520,13 +520,29 @@ At this point, the query builder became fully **schema-driven end-to-end**:
 
 Phase 3 was the point where the system stopped being just type-aware and became truly **schema-driven and intelligent**.
 
-This phase was about creating the compiler that creates the MongoDB code. I chose MongoDB first because it was easier to implement than either SQL or Prisma and thought that they can be implemented later.
+# **Phase 4**
 
-So I started with creating a file called queryCompiler.ts and started with a function called compileTreeToMongo that takes in a node as a parameter, and returns the compiled object.
+This phase was about creating the **compiler** that generates MongoDB queries from the query tree.
 
-But the logic for a ruleNode and a groupNode would be completely different.So if teh node is a rule, we define the shape of the response pertaining to teh operator. But this project is about sclability, and that method is not scalable. So instead, we use an operatorMap.
+I chose MongoDB first because it was easier to implement than either SQL or Prisma, and I figured those could always be added later.
 
-I started with something simple first to see how the concept works
+## **1. Building the Query Compiler**
+
+I started by creating a file called `queryCompiler.ts`.
+
+Inside it, I created a function called `compileTreeToMongo()` that takes a node as a parameter and returns the compiled MongoDB query object.
+
+The first thing I realized was that the logic for compiling a `RuleNode` and a `GroupNode` would be completely different.
+
+### **Compiling Rule Nodes**
+
+If the node is a rule, we need to generate a MongoDB condition based on the selected operator.
+
+Initially, I thought about handling every operator with a bunch of conditionals, but this project is supposed to be scalable, and that approach would become messy very quickly.
+
+Instead, I introduced an `operatorMap`.
+
+I started with a simple version to prove the concept:
 
 ```ts
 export const operatorMap: Record<string, string> = {
@@ -540,24 +556,138 @@ export const operatorMap: Record<string, string> = {
 };
 ```
 
-And tehn we import that operatorMap into teh compiler and tehn access the operator"s new name by using the rule.operator and assigning that to a variable.
+Then I imported `operatorMap` into the compiler and mapped each operator to its MongoDB equivalent:
 
-If the mongoOperator is null, teh we return a key of slug of the rule.field which its value is the rule.value. And if that is not the case, we return a slug of the rule.field with the value of an object, whuch contains the mongoOperator as teh property with the value of teh rule.value.
+```ts
+const mongoOperator = operatorMap[rule.operator];
+```
 
-And that is for if te node.type is a rule.
+If `mongoOperator` is empty or undefined, I simply return the field and value directly:
 
-If the node.type is a group
+```ts
+{
+  [rule.field]: rule.value
+}
+```
 
-We assign the node to a variable called group.
-And then the variable called compild children is equal to the value returned from mapping over group.childrenand in teh process compileTreeToMonog with the parameter of teh child. then after we filter the values of teh child that are not undefined.
+For example:
 
-Then we have special cases for AND and OR. If teh logic operator is AND, then we return $and as the key and the children as the vaalue. But that is if the length is more than 1. If teh length of compiledChildren i 1, then we return the first child of compiledChildren.
+```json
+{
+  "status": "active"
+}
+```
 
-For OR, we return the $Or key with the value of compiledChhildren.
+If a MongoDB operator exists, I return the field with a nested object:
+
+```ts
+{
+  [rule.field]: {
+    [mongoOperator]: rule.value
+  }
+}
+```
+
+For example:
+
+```json
+{
+  "age": {
+    "$gt": 18
+  }
+}
+```
+
+This allows new operators to be added later simply by updating the `operatorMap`.
+
+---
+
+### **Compiling Group Nodes**
+
+Groups are where recursion becomes important again.
+
+If the node type is a group, I first assign the node to a variable called `group`.
+
+Then I create a variable called `compiledChildren`.
+
+This is created by mapping over every child and recursively calling:
+
+```ts
+compileTreeToMongo(child);
+```
+
+on each one.
+
+After that, I filter out any undefined values:
+
+```ts
+const compiledChildren = group.children
+  .map((child) => compileTreeToMongo(child))
+  .filter((child): child is Record<string, unknown> => child !== undefined);
+```
+
+The next step is handling the logical operators.
+
+If there are no children:
+
+```ts
+if (compiledChildren.length === 0) {
+  return {};
+}
+```
+
+then we simply return an empty object.
+
+For **AND** groups, I added a special optimization.
+
+If there is only one child:
+
+```ts
+if (compiledChildren.length === 1) {
+  return compiledChildren[0];
+}
+```
+
+there is no need to wrap it inside an `$and`.
+
+Otherwise:
+
+```ts
+return {
+  $and: compiledChildren,
+};
+```
+
+For example:
+
+```json
+{
+  "$and": [{ "age": { "$gt": 18 } }, { "status": "active" }]
+}
+```
+
+For **OR** groups:
+
+```ts
+return {
+  $or: compiledChildren,
+};
+```
+
+For example:
+
+```json
+{
+  "$or": [{ "status": "active" }, { "status": "inactive" }]
+}
+```
+
+The final implementation looked like this:
 
 ```ts
 if (node.type === "group") {
   const group = node;
+
   const compiledChildren = group.children
     .map((child) => compileTreeToMongo(child))
     .filter((child): child is Record<string, unknown> => child !== undefined);
@@ -570,10 +700,12 @@ if (node.type === "group") {
     if (compiledChildren.length === 1) {
       return compiledChildren[0];
     }
+
     return {
       $and: compiledChildren,
     };
   }
+
   if (group.logic === "OR") {
     return {
       $or: compiledChildren,
@@ -582,13 +714,89 @@ if (node.type === "group") {
 }
 ```
 
-Then we have to reflect that in the store, so we import the function helper into the store, and then add in compiledQuery to the store, which is either the compiledObject or null. So initially, we set it to null, but in addNodeToTree, removeNodeFromTree, and updateNodeInTree, we set compiledQuery to be compiledTreeToMongo of the updated tree. and then we add it to the set method.
+## **2. Connecting the Compiler to the Store**
 
-And now, I decided to shift the layout of teh whole application. Initially we had the pre block on top whuch had the json and then the group element, which was teh buider. But now with the introduction of the compiler, I wanted the code to feature a tabs layout instead of the builder, then the json and then the results, whuch I would be building in a later phase. So I created a compoenent called QueryBuilder, and then shifted the comipler and the group compoeennt to that page, and then rendered them side by side. Then I moved the pre elemnt into a new componenet called JSONPreview and then added it as a tab. and then lastly was the results tab which did not have anything inside at the moment.
+After the compiler was working, I needed to reflect that in the store.
 
-I kept the tabs in the home compoenent.
+I imported `compileTreeToMongo()` into the store and introduced a new piece of state:
 
-As for the QueryPreview, I took the compiledQuery from teh store. and then rendered it with JSON.stringify.
+```ts
+compiledQuery;
+```
+
+This stores the generated MongoDB query.
+
+Initially, it is set to `null`
+
+Then, whenever the tree changes, I regenerate the compiled query.
+
+This happens in:
+
+- `addNodeToTree`
+- `removeNodeFromTree`
+- `updateNodeInTree`
+
+The flow became:
+
+1. Update the tree
+2. Compile the tree
+3. Save both values into the store
+
+Something along the lines of:
+
+```ts
+const updatedTree = addNode(...);
+
+set({
+  tree: updatedTree,
+  compiledQuery: compileTreeToMongo(updatedTree),
+});
+```
+
+This means the generated query is always synchronized with the query builder state.
+
+## **3. Restructuring the Application Layout**
+
+At this point, the application was starting to grow.
+
+Originally, the page looked like this: `Builder`, `JSON` and `Results`
+
+with the JSON displayed in a `<pre>` block above everything else.
+
+But now that the compiler existed, I wanted a cleaner structure.
+
+So I created a new component called `QueryBuilder`
+
+and moved both:
+
+- the Group component
+- the compiler preview
+
+inside it.
+
+I then displayed them side-by-side.
+
+### **Creating Tabs**
+
+Next, I moved the JSON preview into its own component, `JSONPreview`
+
+and added a tabs layout.
+
+The tabs became:
+
+- Builder
+- JSON
+- Results
+
+The Results tab was still empty at this stage because query execution would be implemented later.
+
+The tabs themselves remained inside the Home component.
+
+## **4. Query Preview**
+
+For the query preview, I pulled `compiledQuery` directly from the store.
+
+Then I rendered it using:
 
 ```tsx
 <pre className="text-xs">
@@ -596,7 +804,13 @@ As for the QueryPreview, I took the compiledQuery from teh store. and then rende
 </pre>
 ```
 
-And tehn I decided to take everything one step further. By adding a sidebar.
+This gives users a real-time view of the generated MongoDB query as they build conditions.
+
+## **5. Introducing a Sidebar**
+
+Then I decided to take everything one step further by introducing a sidebar.
+
+I used the Shadcn sidebar components:
 
 ```tsx
 import {
@@ -614,9 +828,18 @@ import {
 } from "@/components/ui/sidebar";
 ```
 
-I did this in the layout.tsx to make it easier later for page transitions.
+I implemented this inside `layout.tsx`.
 
-Then i ensured taht I dynamically rendered the routes by creating an array with the label of the route and its href and then map over the array in SidebarMenu for eaach SidebarMenuItem.
+The reason for doing this early was to make future navigation and page transitions easier as the application grows.
+
+### **Dynamic Route Rendering**
+
+Instead of hardcoding links, I created a routes array containing:
+
+- label
+- href
+
+Then I dynamically rendered the sidebar navigation using `map()`:
 
 ```tsx
 <SidebarMenu>
@@ -630,11 +853,22 @@ Then i ensured taht I dynamically rendered the routes by creating an array with 
 </SidebarMenu>
 ```
 
+This makes it much easier to add or remove routes later.
 
-Then I redefined the whole layout of the page. I added in four new routes, /, /saved, /import, /playground, /schema.
+## **6. Expanding the Application Structure**
 
-The / route then had the Home componenet. Then I removed the results tab in teh home compoenent. 
+After introducing the sidebar, I restructured the application into multiple routes:
 
+- `/`
+- `/saved`
+- `/import`
+- `/playground`
+- `/schema`
 
-And that ended what I did for phase 4.
+The `/` route became the Home page and contained the main query builder experience.
 
+Since the application was no longer dependent on tabs for everything, I removed the Results tab from the Home component.
+
+Phase 4 was mainly about moving from a simple query tree into a complete query-building system.
+
+By the end of this phase, I had a recursive MongoDB compiler, real-time query generation, compiler integration with state management, a dedicated query preview, a scalable application layout, sidebar navigation, and a route-based organization
