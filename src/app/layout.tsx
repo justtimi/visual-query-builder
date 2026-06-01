@@ -17,6 +17,7 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
+import { WorkspaceTools } from "@/components/WorkspaceTools";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -83,12 +84,7 @@ export default function RootLayout({
 
                 <SidebarGroup>
                   <SidebarGroupLabel>Workspace Tools</SidebarGroupLabel>
-
-                  <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton>Clear Builder</SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
+                  <WorkspaceTools />
                 </SidebarGroup>
               </SidebarContent>
             </Sidebar>
