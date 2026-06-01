@@ -64,14 +64,6 @@ export default function RootLayout({
                     <SidebarMenuItem>
                       <SidebarMenuButton>Builder</SidebarMenuButton>
                     </SidebarMenuItem>
-
-                    <SidebarMenuItem>
-                      <SidebarMenuButton>Query Preview</SidebarMenuButton>
-                    </SidebarMenuItem>
-
-                    <SidebarMenuItem>
-                      <SidebarMenuButton>Run Query</SidebarMenuButton>
-                    </SidebarMenuItem>
                   </SidebarMenu>
                 </SidebarGroup>
 
