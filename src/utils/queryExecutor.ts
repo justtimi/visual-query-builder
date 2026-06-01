@@ -1,21 +1,24 @@
-
 import { QueryNode, RuleNode } from "@/types/query";
-import { users } from "@/lib/mockData";
-import { User } from "@/types/data";
 
-export function executeQuery(tree: QueryNode) {
-  return users.filter((item) => evaluateNode(item, tree));
+type OperatorFn = (a: unknown, b: unknown) => boolean;
+
+export function evaluateQuery<T extends Record<string, unknown>>(
+  tree: QueryNode,
+  data: T[],
+) {
+  return data.filter((item) => evaluateNode(item, tree));
 }
 
-function evaluateNode(item: User, node: QueryNode): boolean {
+function evaluateNode<T extends Record<string, unknown>>(
+  item: T,
+  node: QueryNode,
+): boolean {
   if (node.type === "rule") {
     return evaluateRule(item, node);
   }
 
   if (node.type === "group") {
-    const results = node.children.map((child) =>
-      evaluateNode(item, child)
-    );
+    const results = node.children.map((child) => evaluateNode(item, child));
 
     return node.logic === "AND"
       ? results.every(Boolean)
@@ -25,27 +28,23 @@ function evaluateNode(item: User, node: QueryNode): boolean {
   return false;
 }
 
-function evaluateRule(item: User, rule: RuleNode): boolean {
-  const value = item[rule.field as keyof User];
+function evaluateRule<T extends Record<string, unknown>>(
+  item: T,
+  rule: RuleNode,
+): boolean {
+  const value = item[rule.field as keyof T];
 
-  switch (rule.operator) {
-    case "equals":
-      return value === rule.value;
+  const operators: Record<string, OperatorFn> = {
+    equals: (a, b) => a === b,
+    not_equals: (a, b) => a !== b,
+    contains: (a, b) => String(a).includes(String(b)),
+    greater_than: (a, b) => Number(a) > Number(b),
+    less_than: (a, b) => Number(a) < Number(b),
+  };
 
-    case "not_equals":
-      return value !== rule.value;
+  const op = operators[rule.operator];
 
-    case "contains":
-      return String(value).includes(String(rule.value));
+  if (!op) return false;
 
-    case "greater_than":
-      return Number(value) > Number(rule.value);
-
-    case "less_than":
-      return Number(value) < Number(rule.value);
-
-    default:
-      return false;
-  }
+  return op(value, rule.value);
 }
-

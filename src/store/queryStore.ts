@@ -8,8 +8,11 @@ import { validateQuery } from "@/utils/validateQuery";
 import { ValidationError as AppValidationError } from "@/types/validation";
 import { toast } from "sonner";
 import { compileTreeToMongo } from "@/utils/queryCompiler";
-import { executeQuery } from "@/utils/queryExecutor";
+import { evaluateQuery } from "@/utils/queryExecutor";
 import { User } from "@/types/data";
+import { users } from "@/lib/mockData";
+
+type ExecutionState = "idle" | "running" | "success" | "empty";
 
 interface QueryStore {
   tree: QueryNode;
@@ -22,14 +25,15 @@ interface QueryStore {
   compiledQuery: Record<string, unknown> | null;
   results: User[];
   isLoading: boolean;
-  executedTree: QueryNode | null;
   runQuery: () => Promise<void>;
   clearResults: () => void;
+  executionState: ExecutionState;
 }
 
 export const useQueryStore = create<QueryStore>((set, get) => ({
   tree: createGroup(),
   compiledQuery: null,
+  executionState: "idle",
   validationErrors: [],
   results: [],
   isLoading: false,
@@ -60,16 +64,28 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
   },
 
   runQuery: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, executionState: "running" });
+
     await new Promise((res) => setTimeout(res, 300));
 
     const tree = get().tree;
-    const results = executeQuery(tree);
+    const results = evaluateQuery(tree, users);
 
-    set({ results, executedTree: tree, isLoading: false });
+    const executionState: ExecutionState =
+      results.length > 0 ? "success" : "empty";
+
+    set({
+      results,
+      isLoading: false,
+      executionState,
+    });
   },
 
   clearResults: () => {
-    set({ results: [], executedTree: null });
+    set({
+      results: [],
+      isLoading: false,
+      executionState: "idle",
+    });
   },
 }));
