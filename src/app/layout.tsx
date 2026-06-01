@@ -5,18 +5,10 @@ import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
 import {
   SidebarProvider,
-  Sidebar,
-  SidebarContent,
   SidebarTrigger,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarSeparator,
   SidebarInset,
 } from "@/components/ui/sidebar";
-import { WorkspaceTools } from "@/components/WorkspaceTools";
+import SidebarRoot from "@/components/Sidebar";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -55,63 +47,7 @@ export default function RootLayout({
       <body className="min-h-full flex">
         <SidebarProvider>
           <div className="flex w-full min-h-screen">
-            <Sidebar>
-              <SidebarContent>
-                <SidebarGroup>
-                  <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-
-                  <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton>Builder</SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroup>
-
-                <SidebarSeparator />
-
-                <SidebarGroup>
-                  <SidebarGroupLabel>Workspace Tools</SidebarGroupLabel>
-                  <WorkspaceTools />
-                </SidebarGroup>
-
-                <SidebarSeparator />
-
-                <SidebarGroup>
-                  <SidebarGroupLabel>Saved Queries</SidebarGroupLabel>
-
-                  <SidebarMenu>
-                    {/* later replace with Zustand savedQueries */}
-                    <SidebarMenuItem>
-                      <SidebarMenuButton>My First Query</SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroup>
-
-                <SidebarSeparator />
-
-                <SidebarGroup>
-                  <SidebarGroupLabel>History</SidebarGroupLabel>
-
-                  <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton>Last Run</SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroup>
-
-                <SidebarSeparator />
-
-                <SidebarGroup>
-                  <SidebarGroupLabel>System</SidebarGroupLabel>
-
-                  <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton>Toggle Theme</SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroup>
-              </SidebarContent>
-            </Sidebar>
+            <SidebarRoot />
 
             <SidebarInset>
               <SidebarTrigger />

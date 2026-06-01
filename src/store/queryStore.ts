@@ -11,6 +11,7 @@ import { compileTreeToMongo } from "@/utils/queryCompiler";
 import { evaluateQuery } from "@/utils/queryExecutor";
 import { User } from "@/types/data";
 import { users } from "@/lib/mockData";
+import { SavedQuery, QueryHistoryItem } from "@/types/savedQuery";
 
 type ExecutionState = "idle" | "running" | "success" | "empty";
 
@@ -28,6 +29,13 @@ interface QueryStore {
   runQuery: () => Promise<void>;
   clearResults: () => void;
   executionState: ExecutionState;
+  savedQueries: SavedQuery[];
+  queryHistory: QueryHistoryItem[];
+  executedTree: QueryNode | null;
+  addSavedQuery: (tree: QueryNode, name?: string) => void;
+  loadSavedQuery: (query: { tree: QueryNode }) => void;
+
+  addToHistory: (query: QueryNode) => void;
 }
 
 export const useQueryStore = create<QueryStore>((set, get) => ({
@@ -38,6 +46,9 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
   results: [],
   isLoading: false,
   executedTree: null,
+
+  savedQueries: [],
+  queryHistory: [],
 
   setTree: (tree) => set({ tree, compiledQuery: compileTreeToMongo(tree) }),
   setValidationErrors: (errors) => set({ validationErrors: errors }),
@@ -63,6 +74,18 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
     }
   },
 
+  addToHistory: (tree) =>
+    set((state) => ({
+      queryHistory: [
+        {
+          id: crypto.randomUUID(),
+          tree,
+          createdAt: Date.now(),
+        },
+        ...state.queryHistory,
+      ],
+    })),
+
   runQuery: async () => {
     set({ isLoading: true, executionState: "running" });
 
@@ -71,6 +94,8 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
     const tree = get().tree;
     const results = evaluateQuery(tree, users);
 
+    get().addToHistory(tree);
+
     const executionState: ExecutionState =
       results.length > 0 ? "success" : "empty";
 
@@ -78,6 +103,7 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
       results,
       isLoading: false,
       executionState,
+      executedTree: tree,
     });
   },
 
@@ -86,6 +112,35 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
       results: [],
       isLoading: false,
       executionState: "idle",
+    });
+  },
+  addSavedQuery: (tree, name = `Query ${new Date().toLocaleTimeString()}`) =>
+    set((state) => {
+      const exists = state.savedQueries.some(
+        (q) => JSON.stringify(q.tree) === JSON.stringify(tree),
+      );
+
+      if (exists) return state;
+
+      return {
+        savedQueries: [
+          {
+            id: crypto.randomUUID(),
+            name,
+            tree,
+            createdAt: Date.now(),
+          },
+          ...state.savedQueries,
+        ],
+      };
+    }),
+  loadSavedQuery: (saved) => {
+    set({
+      tree: saved.tree,
+      compiledQuery: compileTreeToMongo(saved.tree),
+      executionState: "idle",
+      results: [],
+      executedTree: null,
     });
   },
 }));
