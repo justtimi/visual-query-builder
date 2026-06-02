@@ -13,12 +13,12 @@ export default function QueryBuilder() {
       <h1 className="text-3xl font-bold">Query Simulator</h1>
 
       <div className="flex flex-col lg:flex-row gap-4">
-        <ScrollArea className="w-full lg:w-1/2 h-[75vh] lg:sticky lg:top-4">
+        <ScrollArea className="w-full lg:w-1/2 h-[75vh]">
           <Group node={tree} />
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
 
-        <ScrollArea className="w-full lg:w-1/2 lg:sticky lg:top-4 h-[75vh] ">
+        <ScrollArea className="w-full lg:w-1/2 h-[75vh] ">
           <QueryPreview />
         </ScrollArea>
       </div>
