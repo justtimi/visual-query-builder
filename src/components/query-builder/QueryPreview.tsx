@@ -6,7 +6,7 @@ export function QueryPreview() {
   const compiledQuery = useQueryStore((s) => s.compiledQuery);
 
   return (
-    <div className="border rounded p-3 h-full overflow-auto w-1/2 shrink-0">
+    <div className="border rounded p-3 w-full">
       <h2 className="text-sm font-semibold mb-2">
         Query Preview
       </h2>
