@@ -5,7 +5,7 @@ import { Rule } from "./Rule";
 import { useQueryStore } from "@/store/queryStore";
 import { createRule, createGroup } from "@/utils/createNode";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -66,8 +66,8 @@ export function Group({ node }: Props) {
           <span className="text-sm font-semibold">GROUP</span>
         </div>
 
-        <Button variant="destructive" size="sm" onClick={handleDelete}>
-          Delete
+        <Button variant="destructive" size="icon" onClick={handleDelete}>
+          <Trash2 className="h-4 w-4" />
         </Button>
       </div>
 

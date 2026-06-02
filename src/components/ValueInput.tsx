@@ -8,6 +8,10 @@ import {
   SelectValue,
 } from "./ui/select";
 import { getFieldUiType, getEnumOptions } from "@/utils/schema";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Calendar } from "./ui/calendar";
+import { Button } from "./ui/button";
+import { format } from "date-fns";
 
 type Props = {
   field: string;
@@ -19,11 +23,13 @@ export function ValueInput({ field, value, onChange }: Props) {
   const uiType = getFieldUiType(field);
 
   if (!field) {
-    return <Input disabled placeholder="Select a field first" className="w-fit" />;
+    return (
+      <Input disabled placeholder="Select a field first" className="w-fit" />
+    );
   }
 
   const safeValue =
-  value === undefined || value === null ? undefined : String(value);
+    value === undefined || value === null ? undefined : String(value);
 
   switch (uiType) {
     case "select":
@@ -55,12 +61,25 @@ export function ValueInput({ field, value, onChange }: Props) {
 
     case "date":
       return (
-        <Input
-          type="date"
-          className="w-40"
-          value={String(value ?? "")}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-40 justify-start">
+              {value ? format(new Date(value as string), "PPP") : "Pick a date"}
+            </Button>
+          </PopoverTrigger>
+
+          <PopoverContent className="p-0 w-auto">
+            <Calendar
+              mode="single"
+              selected={value ? new Date(value as string) : undefined}
+              onSelect={(date) => {
+                if (date) {
+                  onChange(format(date, "yyyy-MM-dd"));
+                }
+              }}
+            />
+          </PopoverContent>
+        </Popover>
       );
 
     case "text":

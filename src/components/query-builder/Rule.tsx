@@ -88,7 +88,7 @@ export function Rule({ node }: Props) {
       />
 
       <Button
-        size="sm"
+        size="icon"
         variant="destructive"
         onClick={() => removeNodeFromTree(node.id)}
       >
