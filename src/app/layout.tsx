@@ -9,6 +9,7 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import SidebarRoot from "@/components/Sidebar";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -42,6 +43,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={cn(
         "h-full",
         "antialiased",
@@ -52,16 +54,18 @@ export default function RootLayout({
       )}
     >
       <body className="min-h-full flex">
-        <SidebarProvider>
-          <div className="flex w-full min-h-screen">
-            <SidebarRoot />
+        <ThemeProvider>
+          <SidebarProvider>
+            <div className="flex w-full min-h-screen">
+              <SidebarRoot />
 
-            <SidebarInset>
-              <SidebarTrigger />
-              {children}
-            </SidebarInset>
-          </div>
-        </SidebarProvider>
+              <SidebarInset>
+                <SidebarTrigger />
+                {children}
+              </SidebarInset>
+            </div>
+          </SidebarProvider>
+        </ThemeProvider>
 
         <Toaster richColors />
       </body>

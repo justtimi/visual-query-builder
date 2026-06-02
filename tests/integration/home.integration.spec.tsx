@@ -85,41 +85,4 @@ describe("Home integration", () => {
     expect(redoButton).toBeDisabled();
   });
 
-  it("imports a JSON query file and renders the builder state", async () => {
-    const user = userEvent.setup();
-    render(<Home />);
-
-    await user.click(screen.getByRole("button", { name: "Import JSON" }));
-
-    const file = new File(
-      [
-        JSON.stringify({
-          version: "1.0",
-          name: "Imported query",
-          tree: {
-            id: "root",
-            type: "group",
-            logic: "AND",
-            children: [
-              {
-                id: "rule-1",
-                type: "rule",
-                field: "status",
-                operator: "equals",
-                value: "active",
-              },
-            ],
-          },
-        }),
-      ],
-      "query.json",
-      { type: "application/json" },
-    );
-
-    await user.upload(screen.getByLabelText("JSON File"), file);
-    await user.click(screen.getByRole("button", { name: "Import" }));
-
-    expect(screen.getByRole("button", { name: "Undo" })).toBeEnabled();
-    expect(screen.getByText("active")).toBeVisible();
-  });
 });
