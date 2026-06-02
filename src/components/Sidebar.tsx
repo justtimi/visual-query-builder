@@ -14,8 +14,9 @@ import { useQueryStore } from "@/store/queryStore";
 import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
-import { Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Moon, Sun, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useTheme } from "@teispace/next-themes";
 
 const SidebarRoot = () => {
   const savedQueries = useQueryStore((s) => s.savedQueries);
@@ -23,9 +24,18 @@ const SidebarRoot = () => {
   const deleteSavedQuery = useQueryStore((s) => s.deleteSavedQuery);
   const runQuery = useQueryStore((s) => s.runQuery);
   const queryHistory = useQueryStore((s) => s.queryHistory);
+  const { resolvedTheme, setTheme } = useTheme();
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteTargetName, setDeleteTargetName] = useState<string>("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted && resolvedTheme === "dark";
 
   const openDeleteConfirm = (id: string, name: string) => {
     setDeleteTargetId(id);
@@ -65,7 +75,7 @@ const SidebarRoot = () => {
         <SidebarGroup>
           <SidebarGroupLabel>Saved Queries</SidebarGroupLabel>
 
-          <ScrollArea className="h-20">
+          <ScrollArea className="h-10">
             <SidebarMenu>
               {savedQueries.length === 0 ? (
                 <SidebarMenuItem>
@@ -109,7 +119,7 @@ const SidebarRoot = () => {
         <SidebarGroup>
           <SidebarGroupLabel>History</SidebarGroupLabel>
 
-          <ScrollArea className="h-20">
+          <ScrollArea className="h-10">
             <SidebarMenu>
               {queryHistory.length === 0 ? (
                 <SidebarMenuItem>
@@ -160,7 +170,18 @@ const SidebarRoot = () => {
 
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton>Toggle Theme</SidebarMenuButton>
+              <SidebarMenuButton
+                disabled={!mounted}
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+                aria-label="Toggle theme"
+              >
+                {isDark ? (
+                  <Sun className="w-4 h-4" />
+                ) : (
+                  <Moon className="w-4 h-4" />
+                )}
+                <span>{isDark ? "Light Mode" : "Dark Mode"}</span>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>

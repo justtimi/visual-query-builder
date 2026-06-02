@@ -51,4 +51,57 @@ describe("WorkspaceTools integration", () => {
       screen.queryByText('"version": "1.0"', { exact: false }),
     ).not.toBeInTheDocument();
   });
+
+  it("imports a JSON query file through workspace tools", async () => {
+    const user = userEvent.setup();
+    render(<WorkspaceTools />);
+
+    await user.click(screen.getByRole("button", { name: "Import JSON" }));
+
+    const file = new File(
+      [
+        JSON.stringify({
+          version: "1.0",
+          name: "Imported query",
+          tree: {
+            id: "root",
+            type: "group",
+            logic: "AND",
+            children: [
+              {
+                id: "rule-2",
+                type: "rule",
+                field: "status",
+                operator: "equals",
+                value: "active",
+              },
+            ],
+          },
+        }),
+      ],
+      "query.json",
+      { type: "application/json" },
+    );
+
+    await user.upload(screen.getByLabelText("JSON File"), file);
+    await user.click(screen.getByRole("button", { name: "Import" }));
+
+    const store = useQueryStore.getState();
+
+    expect(store.canUndo).toBe(true);
+    expect(store.tree).toEqual({
+      id: "root",
+      type: "group",
+      logic: "AND",
+      children: [
+        {
+          id: "rule-2",
+          type: "rule",
+          field: "status",
+          operator: "equals",
+          value: "active",
+        },
+      ],
+    });
+  });
 });
