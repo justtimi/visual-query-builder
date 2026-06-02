@@ -1,12 +1,22 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useQueryStore } from "@/store/queryStore";
 import { createGroup } from "@/utils/createNode";
+import { QueryNode } from "@/types/query";
+
+const getChildCount = (tree: QueryNode) => {
+  expect(tree.type).toBe("group");
+  return tree.type === "group" ? tree.children.length : 0;
+};
 
 describe("Query Store", () => {
   beforeEach(() => {
     localStorage.clear();
     useQueryStore.setState({
       tree: createGroup(),
+      pastTrees: [],
+      futureTrees: [],
+      canUndo: false,
+      canRedo: false,
       compiledQuery: null,
       validationErrors: [],
       results: [],
@@ -86,6 +96,37 @@ describe("Query Store", () => {
     expect(
       JSON.parse(localStorage.getItem("queryHistory") ?? "[]"),
     ).toHaveLength(1);
+  });
+
+  it("undoes and redoes builder tree changes", () => {
+    const tree = createGroup();
+    tree.children = [
+      {
+        id: "rule-1",
+        type: "rule",
+        field: "status",
+        operator: "equals",
+        value: "active",
+      },
+    ];
+
+    useQueryStore.getState().setTree(tree);
+
+    expect(getChildCount(useQueryStore.getState().tree)).toBe(1);
+    expect(useQueryStore.getState().canUndo).toBe(true);
+    expect(useQueryStore.getState().canRedo).toBe(false);
+
+    useQueryStore.getState().undo();
+
+    expect(getChildCount(useQueryStore.getState().tree)).toBe(0);
+    expect(useQueryStore.getState().canUndo).toBe(false);
+    expect(useQueryStore.getState().canRedo).toBe(true);
+
+    useQueryStore.getState().redo();
+
+    expect(getChildCount(useQueryStore.getState().tree)).toBe(1);
+    expect(useQueryStore.getState().canUndo).toBe(true);
+    expect(useQueryStore.getState().canRedo).toBe(false);
   });
 
   it("deletes a saved query and removes matching history items", async () => {
