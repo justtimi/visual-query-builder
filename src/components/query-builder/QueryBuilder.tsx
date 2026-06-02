@@ -10,7 +10,7 @@ export default function QueryBuilder() {
 
   return (
     <div className="p-4 space-y-4">
-      <h1 className="text-xl font-bold">Query Builder</h1>
+      <h1 className="text-3xl font-bold">Query Simulator</h1>
 
       <div className="p-4 flex flex-col lg:flex-row gap-4 items-start justify-center">
         <ScrollArea className="w-full lg:w-1/2">

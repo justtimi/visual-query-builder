@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
-import { buildExport, copyToClipboard, exportQuery } from "@/utils/export";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  buildExport,
+  buildExportFilename,
+  copyToClipboard,
+  exportQuery,
+} from "@/utils/export";
 import { createGroup } from "@/utils/createNode";
 
 describe("export helpers", () => {
@@ -32,6 +37,16 @@ describe("export helpers", () => {
     expect(parsed.version).toBe("1.0");
     expect(parsed.name).toBe("My query");
     expect(parsed.tree).toEqual(tree);
+  });
+
+  it("builds export filenames with the selected format suffix", () => {
+    expect(buildExportFilename("My query", "json")).toBe(
+      "My query-json.json",
+    );
+    expect(buildExportFilename("My query", "compiled-mongo")).toBe(
+      "My query-compiled-mongo.json",
+    );
+    expect(buildExportFilename("", "json")).toBe("query-json.json");
   });
 
   it("copies text to the clipboard", async () => {

@@ -15,12 +15,36 @@ import { SavedQuery, QueryHistoryItem } from "@/types/savedQuery";
 
 type ExecutionState = "idle" | "running" | "success" | "empty";
 
+const MAX_HISTORY = 50;
+
+const cloneTree = (tree: QueryNode): QueryNode =>
+  JSON.parse(JSON.stringify(tree)) as QueryNode;
+
+const treesMatch = (left: QueryNode, right: QueryNode) =>
+  JSON.stringify(left) === JSON.stringify(right);
+
+const buildTreeState = (tree: QueryNode) => ({
+  tree,
+  compiledQuery: compileTreeToMongo(tree),
+  validationErrors: validateQuery(tree),
+  results: [],
+  isLoading: false,
+  executionState: "idle" as ExecutionState,
+  executedTree: null,
+});
+
 interface QueryStore {
   tree: QueryNode;
+  pastTrees: QueryNode[];
+  futureTrees: QueryNode[];
+  canUndo: boolean;
+  canRedo: boolean;
   setTree: (tree: QueryNode) => void;
   addNodeToTree: (parentId: string, node: QueryNode) => void;
   removeNodeFromTree: (nodeId: string) => void;
   updateNodeInTree: (nodeId: string, updates: Partial<QueryNode>) => void;
+  undo: () => void;
+  redo: () => void;
   validationErrors: AppValidationError[];
   setValidationErrors: (errors: AppValidationError[]) => void;
   compiledQuery: Record<string, unknown> | null;
@@ -43,6 +67,10 @@ interface QueryStore {
 
 export const useQueryStore = create<QueryStore>((set, get) => ({
   tree: createGroup(),
+  pastTrees: [],
+  futureTrees: [],
+  canUndo: false,
+  canRedo: false,
   compiledQuery: null,
   executionState: "idle",
   validationErrors: [],
@@ -56,7 +84,7 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
     try {
       const raw = localStorage.getItem("savedQueries");
       return raw ? (JSON.parse(raw) as SavedQuery[]) : [];
-    } catch (e) {
+    } catch {
       return [];
     }
   })(),
@@ -66,35 +94,87 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
     try {
       const raw = localStorage.getItem("queryHistory");
       return raw ? (JSON.parse(raw) as QueryHistoryItem[]) : [];
-    } catch (e) {
+    } catch {
       return [];
     }
   })(),
   selectedTab: "builder",
 
-  setTree: (tree) => set({ tree, compiledQuery: compileTreeToMongo(tree) }),
+  setTree: (tree) =>
+    set((state) => {
+      if (treesMatch(state.tree, tree)) return state;
+
+      const pastTrees = [...state.pastTrees, cloneTree(state.tree)].slice(
+        -MAX_HISTORY,
+      );
+
+      return {
+        ...buildTreeState(tree),
+        pastTrees,
+        futureTrees: [],
+        canUndo: pastTrees.length > 0,
+        canRedo: false,
+      };
+    }),
   setValidationErrors: (errors) => set({ validationErrors: errors }),
 
   addNodeToTree: (parentId, node) => {
     const updated = addNode(get().tree, parentId, node);
-    set({ tree: updated, compiledQuery: compileTreeToMongo(updated) });
+    get().setTree(updated);
   },
 
   removeNodeFromTree: (nodeId) => {
     const updated = removeNode(get().tree, nodeId);
-    set({ tree: updated, compiledQuery: compileTreeToMongo(updated) });
+    get().setTree(updated);
   },
 
   updateNodeInTree: (nodeId, updates) => {
     const updated = updateNode(get().tree, nodeId, updates);
     const errors = validateQuery(updated);
-
-    const compiled = compileTreeToMongo(updated);
-    set({ tree: updated, validationErrors: errors, compiledQuery: compiled });
+    get().setTree(updated);
     if (errors.length > 0) {
       toast.error(errors[0].message);
     }
   },
+
+  undo: () =>
+    set((state) => {
+      const previous = state.pastTrees.at(-1);
+      if (!previous) return state;
+
+      const pastTrees = state.pastTrees.slice(0, -1);
+      const futureTrees = [cloneTree(state.tree), ...state.futureTrees].slice(
+        0,
+        MAX_HISTORY,
+      );
+
+      return {
+        ...buildTreeState(cloneTree(previous)),
+        pastTrees,
+        futureTrees,
+        canUndo: pastTrees.length > 0,
+        canRedo: futureTrees.length > 0,
+      };
+    }),
+
+  redo: () =>
+    set((state) => {
+      const next = state.futureTrees[0];
+      if (!next) return state;
+
+      const pastTrees = [...state.pastTrees, cloneTree(state.tree)].slice(
+        -MAX_HISTORY,
+      );
+      const futureTrees = state.futureTrees.slice(1);
+
+      return {
+        ...buildTreeState(cloneTree(next)),
+        pastTrees,
+        futureTrees,
+        canUndo: pastTrees.length > 0,
+        canRedo: futureTrees.length > 0,
+      };
+    }),
 
   addToHistory: (tree) =>
     set((state) => {
@@ -110,7 +190,7 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("queryHistory", JSON.stringify(next));
-        } catch (e) {}
+        } catch {}
       }
 
       return { queryHistory: next };
@@ -166,7 +246,7 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("savedQueries", JSON.stringify(newList));
-        } catch (e) {
+        } catch {
           // ignore storage errors
         }
       }
@@ -194,7 +274,7 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
             JSON.stringify(nextSavedQueries),
           );
           localStorage.setItem("queryHistory", JSON.stringify(nextHistory));
-        } catch (e) {
+        } catch {
           // ignore storage errors
         }
       }
@@ -205,9 +285,8 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
       };
     }),
   loadSavedQuery: (saved) => {
+    get().setTree(saved.tree);
     set({
-      tree: saved.tree,
-      compiledQuery: compileTreeToMongo(saved.tree),
       executionState: "idle",
       results: [],
       executedTree: null,

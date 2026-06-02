@@ -4,7 +4,13 @@ import { useQueryStore } from "@/store/queryStore";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { exportQuery, copyToClipboard } from "@/utils/export";
+import {
+  buildExportFilename,
+  copyToClipboard,
+  exportQuery,
+  type ExportFileSuffix,
+} from "@/utils/export";
+import { compileTreeToMongo } from "@/utils/queryCompiler";
 import {
   Dialog,
   DialogContent,
@@ -16,25 +22,35 @@ import { Input } from "./ui/input";
 import { Separator } from "./ui/separator";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
-import { Badge } from "./ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
+
+type ExportFormat = "json" | "compiled-mongo";
 
 export function WorkspaceTools() {
   const tree = useQueryStore((s) => s.tree);
   const setTree = useQueryStore((s) => s.setTree);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("My Query");
+  const [format, setFormat] = useState<ExportFormat>("json");
 
-  const json = open ? exportQuery(tree, name) : "";
+  const exportedJson = open ? exportQuery(tree, name) : "";
+  const compiledMongo = open
+    ? JSON.stringify(compileTreeToMongo(tree) ?? {}, null, 2)
+    : "";
+  const preview = format === "json" ? exportedJson : compiledMongo;
+  const fileSuffix: ExportFileSuffix =
+    format === "json" ? "json" : "compiled-mongo";
 
   const handleOpen = (value: boolean) => {
     setOpen(value);
 
     if (value) {
       setName("My Query");
+      setFormat("json");
     }
   };
   const handleCopy = async () => {
-    await copyToClipboard(json);
+    await copyToClipboard(preview);
 
     toast.success("Query exported (copied to clipboard)", {
       description: "Ready to paste or share",
@@ -54,12 +70,12 @@ export function WorkspaceTools() {
   };
 
   const handleDownload = () => {
-    const blob = new Blob([json], { type: "application/json" });
+    const blob = new Blob([preview], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${name || "query"}.json`;
+    a.download = buildExportFilename(name, fileSuffix);
     a.click();
 
     URL.revokeObjectURL(url);
@@ -98,14 +114,24 @@ export function WorkspaceTools() {
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">Preview</p>
 
-                <Badge variant="secondary">JSON</Badge>
+                <Tabs
+                  value={format}
+                  onValueChange={(value) => setFormat(value as ExportFormat)}
+                >
+                  <TabsList>
+                    <TabsTrigger value="json">JSON</TabsTrigger>
+                    <TabsTrigger value="compiled-mongo">
+                      Compiled Mongo
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
 
               <Card className="bg-muted/30">
                 <CardContent className="p-3">
                   <ScrollArea className="h-48 w-full rounded-md">
                     <pre className="text-xs whitespace-pre-wrap break-words">
-                      {json}
+                      {preview}
                     </pre>
                   </ScrollArea>
                 </CardContent>

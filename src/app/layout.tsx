@@ -23,7 +23,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Query Builder Studio",
+  title: "Timmy's Query Builder",
   description:
     "A visual query builder for constructing, executing, and simulating complex database filters with real-time preview and results.",
   keywords: [
