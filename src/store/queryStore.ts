@@ -34,8 +34,11 @@ interface QueryStore {
   executedTree: QueryNode | null;
   addSavedQuery: (tree: QueryNode, name?: string) => void;
   loadSavedQuery: (query: { tree: QueryNode }) => void;
+  deleteSavedQuery: (id: string) => void;
 
   addToHistory: (query: QueryNode) => void;
+  selectedTab: string;
+  setSelectedTab: (tab: string) => void;
 }
 
 export const useQueryStore = create<QueryStore>((set, get) => ({
@@ -47,8 +50,27 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
   isLoading: false,
   executedTree: null,
 
-  savedQueries: [],
-  queryHistory: [],
+  // load saved queries from localStorage when available
+  savedQueries: ((): SavedQuery[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem("savedQueries");
+      return raw ? (JSON.parse(raw) as SavedQuery[]) : [];
+    } catch (e) {
+      return [];
+    }
+  })(),
+  // load query history from localStorage when available
+  queryHistory: ((): QueryHistoryItem[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem("queryHistory");
+      return raw ? (JSON.parse(raw) as QueryHistoryItem[]) : [];
+    } catch (e) {
+      return [];
+    }
+  })(),
+  selectedTab: "builder",
 
   setTree: (tree) => set({ tree, compiledQuery: compileTreeToMongo(tree) }),
   setValidationErrors: (errors) => set({ validationErrors: errors }),
@@ -75,16 +97,24 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
   },
 
   addToHistory: (tree) =>
-    set((state) => ({
-      queryHistory: [
+    set((state) => {
+      const next: QueryHistoryItem[] = [
         {
           id: crypto.randomUUID(),
           tree,
           createdAt: Date.now(),
         },
         ...state.queryHistory,
-      ],
-    })),
+      ];
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("queryHistory", JSON.stringify(next));
+        } catch (e) {}
+      }
+
+      return { queryHistory: next };
+    }),
 
   runQuery: async () => {
     set({ isLoading: true, executionState: "running" });
@@ -122,16 +152,56 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
 
       if (exists) return state;
 
+      const newList: SavedQuery[] = [
+        {
+          id: crypto.randomUUID(),
+          name,
+          tree,
+          createdAt: Date.now(),
+        },
+        ...state.savedQueries,
+      ];
+
+      // persist to localStorage on client
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("savedQueries", JSON.stringify(newList));
+        } catch (e) {
+          // ignore storage errors
+        }
+      }
+
       return {
-        savedQueries: [
-          {
-            id: crypto.randomUUID(),
-            name,
-            tree,
-            createdAt: Date.now(),
-          },
-          ...state.savedQueries,
-        ],
+        savedQueries: newList,
+      };
+    }),
+  deleteSavedQuery: (id) =>
+    set((state) => {
+      const target = state.savedQueries.find((query) => query.id === id);
+      if (!target) return state;
+
+      const nextSavedQueries = state.savedQueries.filter(
+        (query) => query.id !== id,
+      );
+      const nextHistory = state.queryHistory.filter(
+        (item) => JSON.stringify(item.tree) !== JSON.stringify(target.tree),
+      );
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(
+            "savedQueries",
+            JSON.stringify(nextSavedQueries),
+          );
+          localStorage.setItem("queryHistory", JSON.stringify(nextHistory));
+        } catch (e) {
+          // ignore storage errors
+        }
+      }
+
+      return {
+        savedQueries: nextSavedQueries,
+        queryHistory: nextHistory,
       };
     }),
   loadSavedQuery: (saved) => {
@@ -141,6 +211,8 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
       executionState: "idle",
       results: [],
       executedTree: null,
+      selectedTab: "builder",
     });
   },
+  setSelectedTab: (tab: string) => set({ selectedTab: tab }),
 }));
