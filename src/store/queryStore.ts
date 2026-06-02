@@ -35,7 +35,7 @@ export const useQueryStore = create<QueryStore>((set, get) => ({
   isLoading: false,
   executedTree: null,
 
-  setTree: (tree) => set({ tree }),
+  setTree: (tree) => set({ tree, compiledQuery: compileTreeToMongo(tree) }),
   setValidationErrors: (errors) => set({ validationErrors: errors }),
 
   addNodeToTree: (parentId, node) => {
