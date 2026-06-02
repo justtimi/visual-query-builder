@@ -3,7 +3,7 @@
 import { useQueryStore } from "@/store/queryStore";
 import { Group } from "./Group";
 import { QueryPreview } from "./QueryPreview";
-import { ScrollArea } from "../ui/scroll-area";
+import { ScrollArea, ScrollBar } from "../ui/scroll-area";
 
 export default function QueryBuilder() {
   const tree = useQueryStore((state) => state.tree);
@@ -12,12 +12,13 @@ export default function QueryBuilder() {
     <div className="p-4 space-y-4">
       <h1 className="text-3xl font-bold">Query Simulator</h1>
 
-      <div className="p-4 flex flex-col lg:flex-row gap-4 items-start justify-center">
-        <ScrollArea className="w-full lg:w-1/2">
+      <div className="flex flex-col lg:flex-row gap-4">
+        <ScrollArea className="w-full lg:w-1/2 h-[75vh] lg:sticky lg:top-4">
           <Group node={tree} />
+          <ScrollBar orientation="horizontal" />
         </ScrollArea>
 
-        <ScrollArea className="w-full lg:w-1/2">
+        <ScrollArea className="w-full lg:w-1/2 lg:sticky lg:top-4 h-[75vh] ">
           <QueryPreview />
         </ScrollArea>
       </div>

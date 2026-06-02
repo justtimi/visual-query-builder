@@ -75,7 +75,7 @@ const SidebarRoot = () => {
         <SidebarGroup>
           <SidebarGroupLabel>Saved Queries</SidebarGroupLabel>
 
-          <ScrollArea className="h-20">
+          <ScrollArea className="h-10">
             <SidebarMenu>
               {savedQueries.length === 0 ? (
                 <SidebarMenuItem>
@@ -119,7 +119,7 @@ const SidebarRoot = () => {
         <SidebarGroup>
           <SidebarGroupLabel>History</SidebarGroupLabel>
 
-          <ScrollArea className="h-20">
+          <ScrollArea className="h-10">
             <SidebarMenu>
               {queryHistory.length === 0 ? (
                 <SidebarMenuItem>
